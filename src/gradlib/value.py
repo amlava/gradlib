@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 
 
 class Value:
@@ -9,8 +9,9 @@ class Value:
         self._requires_grad = requires_grad
         self._children = children
 
-        self._grad_func: Callable[[Value], None] = lambda x: None
-        self._grad: Value = Value(0)
+        if requires_grad:
+            self._grad_func: Callable[[Value], None] = lambda x: None
+            self._grad: Value = Value(0)
 
     @property
     def data(self):
@@ -44,13 +45,13 @@ class Value:
         assert self._requires_grad, 'Tried to set grad on Value with requires_grad=False.'
         self._grad = x
 
-    def backward(self, grad: Optional[None] = None) -> None:
+    def backward(self, grad: Optional[Value] = None) -> None:
         assert self._requires_grad, 'Called backward on Value with requires_grad=False.'
 
         if grad is None:
-            self.grad = 1
+            self.grad = Value(1)
         
-        self.grad_func(1)
+        self.grad_func(Value(1))
     
     def __add__(self, other: Value) -> Value:
         return add_values(self, other)
@@ -72,16 +73,24 @@ class Value:
     def __truediv__(self, other: Value) -> Value:
         if other.data == 0:
             raise ZeroDivisionError
-        return self*value_like(other, 1 / other.data)
+        return self*value_like(other, data=1/other.data)
         
     def __floordiv__(self, other: Value) -> Value:
         if other.data == 0:
             raise ZeroDivisionError
-        return self*value_like(other, 1 // other.data)
+        return self*value_like(other, data=1//other.data)
 
 
-def value_like(value: Value, data) -> Value:
-    return Value(data, value.requires_grad, value.children)
+def value_like(
+    value: Value,
+    data: Optional[Any] = None,
+    requires_grad: Optional[bool] = None,
+    children: Optional[list] = None
+) -> Value:
+    data = data if data is not None else value.data
+    requires_grad = requires_grad if requires_grad is not None else value.requires_grad
+    children = children if children is not None else value.children
+    return Value(data, requires_grad, children)
 
 
 def add_values(x: Value, y: Value) -> Value:
@@ -116,10 +125,10 @@ def multiply_values(x: Value, y: Value) -> Value:
 
     def _multiply_func(grad: Value) -> None:
         if x.requires_grad:
-            x.grad += y.data * grad
+            x.grad += Value(y.data) * grad
             x.grad_func(x.grad)
         if y.requires_grad:
-            y.grad += x.data * grad
+            y.grad += Value(x.data) * grad
             y.grad_func(y.grad)
 
     z.grad_func = _multiply_func
