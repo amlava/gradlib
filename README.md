@@ -1,0 +1,1 @@
+An autograd + neural network library without use of any third-party libraries. Written for educational purposes.
