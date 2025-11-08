@@ -27,58 +27,62 @@ class Value:
     
     @property
     def grad_func(self) -> Callable[[Value], None]:
-        assert self._requires_grad, 'Tried to call grad_func on Value with requires_grad=False.'
+        assert self._requires_grad, 'Tried to call "grad_func" on Value with requires_grad=False.'
         return self._grad_func
 
     @grad_func.setter
     def grad_func(self, f: Callable[[Value], None]):
-        assert self._requires_grad, 'Tried to set grad_func on Value with requires_grad=False.'
+        assert self._requires_grad, 'Tried to set "grad_func" on Value with requires_grad=False.'
         self._grad_func = f
 
     @property
     def grad(self) -> Value:
-        assert self._requires_grad, 'Tried to call grad on Value with requires_grad=False.'
+        assert self._requires_grad, 'Tried to call "grad" on Value with requires_grad=False.'
         return self._grad
 
     @grad.setter
     def grad(self, x: Value) -> None:
-        assert self._requires_grad, 'Tried to set grad on Value with requires_grad=False.'
+        assert self._requires_grad, 'Tried to set "grad" on Value with requires_grad=False.'
         self._grad = x
 
     def backward(self, grad: Optional[Value] = None) -> None:
-        assert self._requires_grad, 'Called backward on Value with requires_grad=False.'
-
+        assert self._requires_grad, 'Called "backward" on Value with requires_grad=False.'
         if grad is None:
             self.grad = Value(1)
-        
         self.grad_func(Value(1))
-    
+
+    def copy(self) -> Value:
+        return value_like(self)
+
     def __add__(self, other: Value) -> Value:
         return add_values(self, other)
-    
+
     def __iadd__(self, other: Value) -> Value:
         self._data += other.data 
         return self
-    
+
     def __mul__(self, other: Value) -> Value:
         return multiply_values(self, other)
-    
+
     def __imul__(self, other: Value) -> Value:
         self._data *= other.data
         return self
-    
+
     def __neg__(self) -> Value:
         return Value(-1) * self
-    
+
     def __truediv__(self, other: Value) -> Value:
         if other.data == 0:
             raise ZeroDivisionError
-        return self*value_like(other, data=1/other.data)
-        
+        return self * value_like(other, data=1/other.data)
+
     def __floordiv__(self, other: Value) -> Value:
         if other.data == 0:
             raise ZeroDivisionError
-        return self*value_like(other, data=1//other.data)
+        return self * value_like(other, data=1//other.data)
+
+    def __repr__(self) -> str:
+        return f'Value(data={self._data}, requires_grad={self._requires_grad}, children={self._children})'
 
 
 def value_like(
@@ -92,13 +96,12 @@ def value_like(
     children = children if children is not None else value.children
     return Value(data, requires_grad, children)
 
-
 def add_values(x: Value, y: Value) -> Value:
     requires_grad = x.requires_grad or y.requires_grad
     z = Value(x.data + y.data,
               requires_grad,
               [x, y])
-    
+
     if not requires_grad:
         return z
 
@@ -119,7 +122,7 @@ def multiply_values(x: Value, y: Value) -> Value:
     z = Value(x.data * y.data,
               requires_grad,
               [x, y])
-    
+
     if not requires_grad:
         return z
 
