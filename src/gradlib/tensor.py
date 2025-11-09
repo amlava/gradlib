@@ -25,11 +25,11 @@ class Tensor:
     @property
     def requires_grad(self) -> bool:
         return self._requires_grad
-    
+
     @property
     def shape(self) -> tuple:
         return self._shape
-    
+
     @property
     def grad(self) -> Tensor:
         assert self._requires_grad, 'Called "grad" on a Tensor with requires_grad=False.'
@@ -70,9 +70,13 @@ class Tensor:
 
     def __add__(self, other: Tensor) -> Tensor:
         return add_tensors(self, other)
-    
+
     def __mul__(self, other: Tensor) -> Tensor:
         return multiply_tensors(self, other)
+    
+    def __matmul__(self, other: Tensor) -> Tensor:
+        assert (cond := len(other.shape) == 1) or len(other.shape) == 2
+        return matvecproduct_tensors(self, other) if cond else matmul_tensors(self, other)
 
     def backward(self) -> None:
         assert len(self._shape) == 0, 'Called "backward" on Tensor with dimension larger than 0.'
@@ -81,6 +85,12 @@ class Tensor:
 
     def sum(self) -> Tensor:
         return tensor_sum(self)
+
+    def dot(self, other) -> Tensor:
+        return dotproduct_tensors(self, other)
+
+    def transpose(self) -> Tensor:
+        return transpose_tensor(self)
 
     def __repr__(self) -> str:
         return f'Tensor(data={self.tolist()}, shape={self._shape}, requires_grad={self._requires_grad})'
@@ -115,3 +125,37 @@ def multiply_tensors(x: Tensor, y: Tensor, as_value: bool = False) -> Tensor | N
         return x.data * y.data if as_value else Tensor(x.data * y.data)
     data = [multiply_tensors(x[i], y[i], as_value=True) for i in range(x.shape[0])]
     return data if as_value else Tensor(data)
+
+def transpose_tensor(x: Tensor) -> Tensor:
+    """
+    Transposes a 2d Tensor.
+    """
+    assert len(x.shape) == 2
+    return Tensor([[x[i][j].data for i in range(x.shape[0])] for j in range(x.shape[1])])
+
+def dotproduct_tensors(x: Tensor, y: Tensor) -> Tensor:
+    """
+    Calculates the dot-product of two 1d Tensors. Returns a 0d Tensor.
+    """
+    assert x.shape == y.shape
+    assert len(x.shape) == 1
+    return tensor_sum(multiply_tensors(x, y))
+
+def matvecproduct_tensors(x: Tensor, y: Tensor) -> Tensor:
+    """
+    Calculates the matrix-product of two Tensors.
+    """
+    assert len(x.shape) == 2
+    assert len(y.shape) == 1
+    assert x.shape[1] == y.shape[0]
+    z = Tensor([multiply_tensors(x[i], y).data for i in range(x.shape[0])])
+    return Tensor([tensor_sum(z[i]).data for i in range(z.shape[0])])
+
+def matmul_tensors(x: Tensor, y: Tensor) -> Tensor:
+    """
+    Calculates the matrix-product of two 2d Tensors.
+    """
+    assert len(x.shape) == 2
+    assert len(y.shape) == 2
+    assert x.shape[1] == y.shape[0]
+    return transpose_tensor(Tensor([matvecproduct_tensors(x, transpose_tensor(y)[i]).data for i in range(y.shape[1])]))
